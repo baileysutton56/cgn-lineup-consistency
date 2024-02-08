@@ -1,0 +1,353 @@
+---
+title: "Lineup Consistency"
+author: "Bailey Sutton"
+date: "12/20/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(ggimage)
+library(scales)
+library(showtext)
+library(sysfonts)
+```
+
+# Import
+```{r Import Datasets}
+
+indiv_23 <- read_csv("individual_results_2023.csv")
+team_rank_2023 <- read_csv("team_rank_2023.csv")
+
+team_vt_rank_2023 <- read_csv("team_vt_rank_2023.csv")
+team_ub_rank_2023 <- read_csv("team_ub_rank_2023.csv")
+team_bb_rank_2023 <- read_csv("team_bb_rank_2023.csv")
+team_fx_rank_2023 <- read_csv("team_fx_rank_2023.csv")
+```
+
+```{r Import CGN Fonts}
+
+font_add_google("Roboto", "Roboto")
+font_add_google("Mukta", "Mukta")
+
+showtext_auto()
+```
+
+# Clean Data
+```{r Convert Date}
+
+indiv_23$`Meet Date` <- as.Date(indiv_23$`Meet Date`, format = '%Y-%m-%d')
+```
+
+```{r Convert Team}
+
+indiv_23$Team <- as.factor(indiv_23$Team)
+```
+
+```{r Rename Variable}
+
+indiv_23 <- rename(indiv_23, meet_date = 'Meet Date')
+indiv_23 <- rename(indiv_23, gymnast_id = 'Gymnast ID')
+indiv_23 <- rename(indiv_23, team_id = 'Team ID')
+indiv_23 <- rename(indiv_23, team_meet_id = 'Team Meet ID')
+indiv_23 <- rename(indiv_23, home_away = 'Home/Away')
+indiv_23 <- rename(indiv_23, meet_name = 'Meet Name')
+indiv_23 <- rename(indiv_23, meet_id = 'Meet ID')
+```
+
+```{r Create Dummy Columns}
+
+#create event dummies
+indiv_23 <- mutate(indiv_23, vt_dummy = case_when((is.na(VT) ~ "FALSE"), 
+                                                  TRUE ~ "TRUE"))
+
+indiv_23 <- mutate(indiv_23, ub_dummy = case_when((is.na(UB) ~ "FALSE"),
+                                                  TRUE ~ "TRUE"))
+
+indiv_23 <- mutate(indiv_23, bb_dummy = case_when((is.na(BB) ~ "FALSE"),
+                                                  TRUE ~ "TRUE"))
+
+indiv_23 <- mutate(indiv_23, fx_dummy = case_when((is.na(FX) ~ "FALSE"),
+                                                  TRUE ~ "TRUE"))
+
+#convert to logical
+indiv_23$vt_dummy <- as.logical(indiv_23$vt_dummy)
+indiv_23$ub_dummy <- as.logical(indiv_23$ub_dummy)
+indiv_23$bb_dummy <- as.logical(indiv_23$bb_dummy)
+indiv_23$fx_dummy <- as.logical(indiv_23$fx_dummy)
+```
+
+```{r Count Events}
+
+indiv_23$tot_events <- rowSums(indiv_23[16:19], na.rm = TRUE)
+```
+
+# Calculate LCS Score
+```{r Calculate Difference in Events}
+
+indiv_dif <- indiv_23 %>%
+  group_by(gymnast_id) %>%
+  arrange(meet_date) %>%
+  mutate(event_diff = tot_events - lag(tot_events, default = first(tot_events)))
+```
+
+```{r Calculate Abs Sum by Team}
+
+team_dif <- indiv_dif %>%
+  group_by(Team) %>%
+  summarise(abs_event_diff = sum(abs(event_diff)))
+```
+
+```{r Count Meets by Team}
+
+meet_counts <- indiv_dif %>%
+  group_by(Team) %>%
+  summarise(num_meets = n_distinct(team_meet_id))
+```
+
+```{r Merge team_diff and meet_counts}
+
+team_final <- merge(team_dif, meet_counts, by = "Team")
+```
+
+```{r Calculate Season Event Spots}
+
+#number of meets per team * number of events * number of gymnasts per event
+team_final$event_spots <- team_final$num_meets * 4 * 6
+```
+
+```{r Calculate LCS score}
+
+team_final$lcs_score <- 1 - (team_final$abs_event_diff / team_final$event_spots) 
+```
+
+# Calculate Event LCS
+```{r Format Event Datasets}
+
+#subset datasets
+indiv_vt <- subset(indiv_23, select = c("gymnast_id", "meet_date", "Team", "team_meet_id", "vt_dummy"))
+indiv_ub <- subset(indiv_23, select = c("gymnast_id", "meet_date", "Team", "team_meet_id", "ub_dummy"))
+indiv_bb <- subset(indiv_23, select = c("gymnast_id", "meet_date", "Team", "team_meet_id", "bb_dummy"))
+indiv_fx <- subset(indiv_23, select = c("gymnast_id", "meet_date", "Team", "team_meet_id", "fx_dummy"))
+
+#count events
+indiv_vt$vt_events <- rowSums(indiv_vt[5], na.rm = TRUE)
+indiv_ub$ub_events <- rowSums(indiv_ub[5], na.rm = TRUE)
+indiv_bb$bb_events <- rowSums(indiv_bb[5], na.rm = TRUE)
+indiv_fx$fx_events <- rowSums(indiv_fx[5], na.rm = TRUE)
+```
+
+```{r Calculate Event Diff}
+
+vt_dif <- indiv_vt %>%
+  group_by(gymnast_id) %>%
+  arrange(meet_date) %>%
+  mutate(vt_diff = vt_events - lag(vt_events, default = first(vt_events)))
+
+ub_dif <- indiv_ub %>%
+  group_by(gymnast_id) %>%
+  arrange(meet_date) %>%
+  mutate(ub_diff = ub_events - lag(ub_events, default = first(ub_events)))
+
+bb_dif <- indiv_bb %>%
+  group_by(gymnast_id) %>%
+  arrange(meet_date) %>%
+  mutate(bb_diff = bb_events - lag(bb_events, default = first(bb_events)))
+
+fx_dif <- indiv_fx %>%
+  group_by(gymnast_id) %>%
+  arrange(meet_date) %>%
+  mutate(fx_diff = fx_events - lag(fx_events, default = first(fx_events)))
+```
+
+```{r Calculate Abs Sum by Team}
+
+team_vt_dif <- vt_dif %>%
+  group_by(Team) %>%
+  summarise(abs_vt_diff = sum(abs(vt_diff)))
+
+team_ub_dif <- ub_dif %>%
+  group_by(Team) %>%
+  summarise(abs_ub_diff = sum(abs(ub_diff)))
+
+team_bb_dif <- bb_dif %>%
+  group_by(Team) %>%
+  summarise(abs_bb_diff = sum(abs(bb_diff)))
+
+team_fx_dif <- fx_dif %>%
+  group_by(Team) %>%
+  summarise(abs_fx_diff = sum(abs(fx_diff)))
+```
+
+```{r Merge event_diff and meet_counts}
+
+vt_final <- merge(team_vt_dif, meet_counts, by = "Team")
+ub_final <- merge(team_ub_dif, meet_counts, by = "Team")
+bb_final <- merge(team_bb_dif, meet_counts, by = "Team")
+fx_final <- merge(team_fx_dif, meet_counts, by = "Team")
+```
+
+```{r Calculate Season Event Spots}
+
+#number of meets per team * number of gymnasts per event
+vt_final$event_spots <- vt_final$num_meets * 6
+ub_final$event_spots <- ub_final$num_meets * 6
+bb_final$event_spots <- bb_final$num_meets * 6
+fx_final$event_spots <- fx_final$num_meets * 6
+```
+
+```{r Calculate LCS score}
+
+vt_final$lcs_score <- 1 - (vt_final$abs_vt_diff / vt_final$event_spots) 
+ub_final$lcs_score <- 1 - (ub_final$abs_ub_diff / ub_final$event_spots) 
+bb_final$lcs_score <- 1 - (bb_final$abs_bb_diff / bb_final$event_spots) 
+fx_final$lcs_score <- 1 - (fx_final$abs_fx_diff / fx_final$event_spots) 
+```
+
+#Add Team Rank
+```{r Create Team Rank df}
+
+#subset
+final_rank <- subset(team_rank_2023, select = c(Team, Rank))
+
+#replace W&M name
+final_rank$Team[final_rank$Team == "William &amp; Mary"] <- "William & Mary"
+```
+
+```{r Merge rank_dif and LCS}
+
+team_rank <- merge(final_rank, team_final, by = "Team", all.x = TRUE)
+```
+
+#Add Event Rank
+```{r Subset Events}
+
+#replace W&M name
+team_vt_rank_2023$Team[team_vt_rank_2023$Team == "William &amp; Mary"] <- "William & Mary"
+team_ub_rank_2023$Team[team_ub_rank_2023$Team == "William &amp; Mary"] <- "William & Mary"
+team_bb_rank_2023$Team[team_bb_rank_2023$Team == "William &amp; Mary"] <- "William & Mary"
+team_fx_rank_2023$Team[team_fx_rank_2023$Team == "William &amp; Mary"] <- "William & Mary"
+
+#replace ties with numbers
+team_vt_rank_2023$Rank <- gsub("\\(.*","", team_vt_rank_2023$Rank)
+team_ub_rank_2023$Rank <- gsub("\\(.*","", team_ub_rank_2023$Rank)
+team_bb_rank_2023$Rank <- gsub("\\(.*","", team_bb_rank_2023$Rank)
+team_fx_rank_2023$Rank <- gsub("\\(.*","", team_fx_rank_2023$Rank)
+
+#convert rank to numeric
+team_vt_rank_2023$Rank <- as.numeric(team_vt_rank_2023$Rank)
+team_ub_rank_2023$Rank <- as.numeric(team_ub_rank_2023$Rank)
+team_bb_rank_2023$Rank <- as.numeric(team_bb_rank_2023$Rank)
+team_fx_rank_2023$Rank <- as.numeric(team_fx_rank_2023$Rank)
+
+#select columns
+team_vt <- subset(team_vt_rank_2023, select = c("Event", "Rank", "Team"))
+team_ub <- subset(team_ub_rank_2023, select = c("Event", "Rank", "Team"))
+team_bb <- subset(team_bb_rank_2023, select = c("Event", "Rank", "Team"))
+team_fx <- subset(team_fx_rank_2023, select = c("Event", "Rank", "Team"))
+```
+
+#Graph
+```{r Format Team Graph Data}
+
+#subset
+team_final_sub <- subset(team_rank, select = c("Team", "Rank", "lcs_score"))
+
+#add logos
+team_final_sub$image <- paste0("Logos/", team_final_sub$Team, ".png")
+```
+
+```{r Format Event Graph Data}
+
+#add event columns
+vt_final <- merge(team_vt, vt_final, by = "Team", all.x = TRUE)
+ub_final <- merge(team_ub, ub_final, by = "Team", all.x = TRUE)
+bb_final <- merge(team_bb, bb_final, by = "Team", all.x = TRUE)
+fx_final <- merge(team_fx, fx_final, by = "Team", all.x = TRUE)
+
+#subset columns
+vt_final <- subset(vt_final, select = c("Team", "Event", "Rank", "lcs_score"))
+ub_final <- subset(ub_final, select = c("Team", "Event", "Rank", "lcs_score"))
+bb_final <- subset(bb_final, select = c("Team", "Event", "Rank", "lcs_score"))
+fx_final <- subset(fx_final, select = c("Team", "Event", "Rank", "lcs_score"))
+
+#concatenate
+event_final <- rbind(vt_final, ub_final, bb_final, fx_final)
+
+#add logos
+event_final$image <- paste0("Logos/", event_final$Team, ".png")
+
+#relevel event variable
+event_final$Event <- factor(event_final$Event, levels = c("VT", "UB", "BB", "FX"))
+```
+
+```{r Team Graph}
+
+team_graph <- ggplot(team_final_sub, aes(x = Rank, y = lcs_score, label = Team)) + 
+  geom_image(aes(image = image), size = 0.04) +
+  geom_smooth(method = "lm", se = FALSE, color = "#FC0140") +
+  ggtitle("Lineup Consistency Score Compared to \nFinal Team Rank (2023)") +
+  xlab("Final 2023 Ranking") +
+  ylab("Lineup Consistency Score") +
+  labs(caption = "Data Source: Road to Nationals") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 18, hjust = 0.5, family = "Mukta"),
+        axis.title = element_text(face = "bold", size = 14, family = "Mukta"),
+        axis.text = element_text(face = "bold", family = "Mukta"),
+        plot.caption = element_text(family = "Roboto"))
+```
+
+```{r Event Graph}
+
+event_graph <- ggplot(event_final, aes(x = Rank, y = lcs_score, label = Team)) +
+  facet_wrap(~ Event) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "#FC0140") +
+  ggtitle("Lineup Consistency Score Compared to \nFinal Team Rank by Event (2023)") +
+  xlab("Final 2023 Event Ranking") +
+  ylab("Lineup Consistency Score") +
+  labs(caption = "Data Source: Road to Nationals") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 18, hjust = 0.5, family = "Mukta"),
+        axis.title = element_text(face = "bold", size = 14, family = "Mukta"),
+        axis.text = element_text(face = "bold", family = "Mukta"),
+        strip.text.x = element_text(size = 12, color = "#FFFFFF", face = "bold", family = "Mukta"),
+        strip.background = element_rect(color = "#FC0140", fill = "#FC0140", size = 1.5, linetype = "solid"),
+        plot.caption = element_text(family = "Roboto"))
+```
+
+# Linear Models
+```{r Linear Models}
+
+#team model
+lm_team <- lm(lcs_score ~ Rank, team_final_sub)
+summary(lm_team)
+
+#event models
+lm_vt <- lm(lcs_score ~ Rank, vt_final)
+lm_ub <- lm(lcs_score ~ Rank, ub_final)
+lm_bb <- lm(lcs_score ~ Rank, bb_final)
+lm_fx <- lm(lcs_score ~ Rank, fx_final)
+
+summary(lm_vt)
+summary(lm_ub)
+summary(lm_bb)
+summary(lm_fx)
+```
+
+# Export
+```{r Export Team Graph}
+
+ggsave("team_graph.jpeg", plot = team_graph)
+```
+
+```{r Export Event Graph}
+
+ggsave("event_graph.jpeg", plot = event_graph)
+```
