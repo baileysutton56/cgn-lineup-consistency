@@ -14,7 +14,7 @@ This project adapts [FiveThirtyEight’s](https://projects.fivethirtyeight.com/e
 ### Data
 The data for this project comes from [Road to Nationals (RTN)](https://roadtonationals.com/results/index.php), the official statistical site of NCAA Gymnastics.
 
-2023 individual results and event rankings were scraped using the scraping_rtn Python package developed by CGN Senior Data Editor Claire Harmon.
+2023 individual results and event rankings were scraped using the `scraping_rtn` Python package developed by CGN Senior Data Editor Claire Harmon.
 
 ### Programs
 Data scraping was done with Python using Google Colab. Analysis was done in R and graphics were created using `ggplot2`.
