@@ -17,7 +17,7 @@ The data for this project comes from [Road to Nationals (RTN)](https://roadtonat
 2023 individual results and event rankings were scraped using the scraping_rtn Python package developed by CGN Senior Data Editor Claire Harmon.
 
 ### Programs
-Data scraping was done with Python using Google Colab. Analysis was done in R and graphics were created using [ggplot2](https://cran.r-project.org/web/packages/ggplot2/index.html).
+Data scraping was done with Python using Google Colab. Analysis was done in R and graphics were created using `ggplot2`.
 
 ## Results
 The resulting LCS range from N.C. State at 98.9% to Greenville at 83.3%. The average score across all teams is 90.5%, so on average, only about 10% of a team’s lineup changed over the 2023 season. The trend line indicates a negative relationship between a team’s final ranking and its LCS, so higher-ranked teams at the end of the 2023 season tended to have fewer lineup changes than teams who finished lower in the rankings.
